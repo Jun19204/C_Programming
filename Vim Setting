@@ -1,5 +1,5 @@
 " =================================================================
-" [완전 통합 안정본] 플러그인 + 테마 + C/GDB/Valgrind
+" [C/C++ 전용 Vim 세팅] 플러그인 + 테마 + GCC/G++/GDB/Valgrind
 " =================================================================
 
 " ================================
@@ -56,46 +56,60 @@ let g:cpp_member_variable_highlight = 1
 let g:cpp_class_decl_highlight = 1
 
 " ================================
-" 5. 실행 관련 함수
+" 5. 실행 관련 함수 (C/C++ 자동 선택)
 " ================================
 function! s:ExeName()
     return expand('%:r') . '.out'
 endfunction
 
-function! s:IsCFile()
-    return expand('%:e') ==# 'c'
+" C 또는 C++ 파일인지 확인
+function! s:IsCppFile()
+    let ext = expand('%:e')
+    return ext ==# 'c' || ext ==# 'cpp' || ext ==# 'cc'
+endfunction
+
+" 파일 확장자에 따라 gcc 또는 g++ 선택
+function! s:GetCompiler()
+    if expand('%:e') ==# 'c'
+        return 'gcc'
+    else
+        return 'g++'
+    endif
 endfunction
 
 function! s:Compile()
-    if !s:IsCFile()
-        echo "C 파일이 아님"
+    if !s:IsCppFile()
+        echo "C/C++ 파일이 아님"
         return
     endif
-    execute '!gcc -g ' . expand('%') . ' -o ' . s:ExeName()
+    let bin = s:GetCompiler()
+    execute '!' . bin . ' -g ' . expand('%') . ' -o ' . s:ExeName()
 endfunction
 
 function! s:Run()
-    if !s:IsCFile()
-        echo "C 파일이 아님"
+    if !s:IsCppFile()
+        echo "C/C++ 파일이 아님"
         return
     endif
 
     let exe = s:ExeName()
+    let bin = s:GetCompiler()
 
-    execute '!gcc -g ' . shellescape(expand('%')) . ' -o ' . shellescape(exe)
+    execute '!' . bin . ' -g ' . shellescape(expand('%')) . ' -o ' . shellescape(exe)
     execute '!./' . exe
 endfunction
 
 function! s:Valgrind(type)
-    if !s:IsCFile()
-        echo "C 파일이 아님"
+    if !s:IsCppFile()
+        echo "C/C++ 파일이 아님"
         return
     endif
 
     let exe = s:ExeName()
+    let bin = s:GetCompiler()
 
     " 컴파일
-    execute '!gcc -g ' . shellescape(expand('%')) . ' -o ' . shellescape(exe)
+    execute '!' . bin . ' -g ' . shellescape(expand('%')) . ' -o ' . shellescape(exe)
 
     " 실행
     if a:type ==# 'full'
@@ -108,19 +122,16 @@ endfunction
 " ================================
 " 6. GDB
 " ================================
-function! s:GdbExitHandler(job, status)
-    execute "bdelete!"
-    execute "normal! \<C-w>="
-endfunction
-
 function! s:GDB()
-    if !s:IsCFile()
-        echo "C 파일이 아님"
+    if !s:IsCppFile()
+        echo "C/C++ 파일이 아님"
         return
     endif
 
     let exe = s:ExeName()
-    execute '!gcc -g ' . shellescape(expand('%')) . ' -o ' . shellescape(exe)
+    let bin = s:GetCompiler()
+
+    execute '!' . bin . ' -g ' . shellescape(expand('%')) . ' -o ' . shellescape(exe)
     botright 12split
     call term_start(['gdb', '-q', './' . exe], {
         \ 'exit_cb': function('s:GdbExitHandler'),
