@@ -184,6 +184,9 @@ nnoremap <leader>f :Rg<CR>
 
 inoremap jk <Esc>
 inoremap kj <Esc>
+inoremap <expr> <CR> pumvisible() ? coc#_select_confirm() : "\<CR>"
+inoremap <expr> <Tab> pumvisible() ? "\<C-n>" : "\<Tab>"
+inoremap <expr> <S-Tab> pumvisible() ? "\<C-p>" : "\<S-Tab>"
 
 " ================================
 " 12. WSL 클립보드
@@ -194,4 +197,3 @@ let g:clipboard = {
     \ 'paste': { '+': 'win32yank.exe -o --lf', '*': 'win32yank.exe -o --lf' },
     \ 'cache_enabled': 0,
     \ }
-
