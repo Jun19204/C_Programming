@@ -27,7 +27,7 @@ Plug 'morhetz/gruvbox'
 call plug#end()
 
 " ================================
-" 3. UI / 테마 (중요: plug 이후)
+" 3. UI / 테마
 " ================================
 syntax on
 set number
