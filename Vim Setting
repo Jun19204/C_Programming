@@ -45,7 +45,6 @@ set background=dark
 let g:gruvbox_contrast_dark = 'hard'
 let g:airline_theme='gruvbox'
 
-" 테마 안정 적용
 autocmd VimEnter * colorscheme gruvbox
 
 " ================================
@@ -56,82 +55,100 @@ let g:cpp_member_variable_highlight = 1
 let g:cpp_class_decl_highlight = 1
 
 " ================================
-" 5. 실행 관련 함수 (C/C++ 자동 선택)
+" 5. 실행 관련 함수
 " ================================
+
+" 실행파일 이름 (경로 분리)
 function! s:ExeName()
-    return expand('%:r') . '.out'
+    return 'build/' . expand('%:r')
 endfunction
 
-" C 또는 C++ 파일인지 확인
+" C/C++ 파일 확인
 function! s:IsCppFile()
     let ext = expand('%:e')
     return ext ==# 'c' || ext ==# 'cpp' || ext ==# 'cc'
 endfunction
 
-" 파일 확장자에 따라 gcc 또는 g++ 선택
+" 컴파일러 선택
 function! s:GetCompiler()
-    if expand('%:e') ==# 'c'
-        return 'gcc'
-    else
-        return 'g++'
-    endif
+    return expand('%:e') ==# 'c' ? 'gcc' : 'g++'
 endfunction
 
-function! s:Compile()
+" ================================
+" 6. Build (핵심)
+" ================================
+function! s:Build()
     if !s:IsCppFile()
         echo "C/C++ 파일이 아님"
-        return
+        return ''
     endif
+
+    " build 디렉토리 생성
+    if !isdirectory('build')
+        call mkdir('build', 'p')
+    endif
+
     let bin = s:GetCompiler()
-    execute '!' . bin . ' -g ' . expand('%') . ' -o ' . s:ExeName()
+    let exe = s:ExeName()
+
+    " 같은 확장자 파일 자동 포함
+    let ext = expand('%:e')
+
+    if ext ==# 'c'
+        let files = glob('*.c', 0, 1)
+    else
+        let files = glob('*.cpp', 0, 1)
+    endif
+
+    let sources = join(map(files, 'shellescape(v:val)'), ' ')
+
+    let flags = '-g -Wall -Wextra'
+
+    execute '!' . bin . ' ' . flags . ' ' . sources . ' -o ' . shellescape(exe)
+
+    if v:shell_error != 0
+        echo "컴파일 실패"
+        return ''
+    endif
+
+    return exe
 endfunction
 
+" ================================
+" 7. 실행
+" ================================
 function! s:Run()
-    if !s:IsCppFile()
-        echo "C/C++ 파일이 아님"
-        return
-    endif
+    let exe = s:Build()
+    if exe == '' | return | endif
 
-    let exe = s:ExeName()
-    let bin = s:GetCompiler()
-
-    execute '!' . bin . ' -g ' . shellescape(expand('%')) . ' -o ' . shellescape(exe)
-    execute '!./' . exe
+    execute '!./' . shellescape(exe)
 endfunction
 
+" ================================
+" 8. Valgrind
+" ================================
 function! s:Valgrind(type)
-    if !s:IsCppFile()
-        echo "C/C++ 파일이 아님"
-        return
-    endif
+    let exe = s:Build()
+    if exe == '' | return | endif
 
-    let exe = s:ExeName()
-    let bin = s:GetCompiler()
-
-    " 컴파일
-    execute '!' . bin . ' -g ' . shellescape(expand('%')) . ' -o ' . shellescape(exe)
-
-    " 실행
     if a:type ==# 'full'
-        execute '!valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./' . exe
+        execute '!valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./' . shellescape(exe)
     else
-        execute '!valgrind --leak-check=full ./' . exe
+        execute '!valgrind --leak-check=full ./' . shellescape(exe)
     endif
 endfunction
 
 " ================================
-" 6. GDB
+" 9. GDB
 " ================================
+function! s:GdbExitHandler(job_id, data, event)
+    echo "GDB 종료"
+endfunction
+
 function! s:GDB()
-    if !s:IsCppFile()
-        echo "C/C++ 파일이 아님"
-        return
-    endif
+    let exe = s:Build()
+    if exe == '' | return | endif
 
-    let exe = s:ExeName()
-    let bin = s:GetCompiler()
-
-    execute '!' . bin . ' -g ' . shellescape(expand('%')) . ' -o ' . shellescape(exe)
     botright 12split
     call term_start(['gdb', '-q', './' . exe], {
         \ 'exit_cb': function('s:GdbExitHandler'),
@@ -142,12 +159,12 @@ function! s:GDB()
 endfunction
 
 " ================================
-" 7. 단축키
+" 10. 단축키
 " ================================
 let mapleader=" "
 
 nnoremap <F5> :w<CR>:call <SID>Run()<CR>
-nnoremap <F6> :w<CR>:call <SID>Compile()<CR>
+nnoremap <F6> :w<CR>:call <SID>Build()<CR>
 nnoremap <F7> :w<CR>:call <SID>Valgrind('basic')<CR>
 nnoremap <F8> :w<CR>:call <SID>Valgrind('full')<CR>
 nnoremap <leader>d :w<CR>:call <SID>GDB()<CR>
@@ -159,7 +176,7 @@ tnoremap <F12> <C-\><C-n>:call chansend(b:terminal_job_id, "continue\n")<CR>
 tnoremap <leader>b <C-\><C-n>:call chansend(b:terminal_job_id, "break " . expand('%:p') . ":" . line('.') . "\n")<CR>
 
 " ================================
-" 8. 기타 단축키
+" 11. 기타 단축키
 " ================================
 nnoremap <C-n> :NERDTreeToggle<CR>
 nnoremap <C-p> :Files<CR>
@@ -169,7 +186,7 @@ inoremap jk <Esc>
 inoremap kj <Esc>
 
 " ================================
-" 9. WSL 클립보드
+" 12. WSL 클립보드
 " ================================
 let g:clipboard = {
     \ 'name': 'win32yank',
@@ -177,3 +194,4 @@ let g:clipboard = {
     \ 'paste': { '+': 'win32yank.exe -o --lf', '*': 'win32yank.exe -o --lf' },
     \ 'cache_enabled': 0,
     \ }
+
